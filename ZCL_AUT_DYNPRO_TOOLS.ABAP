@@ -1,16 +1,21 @@
+
+
 ********************************************************************
 *ZCL_AUT_DYNPRO_TOOLS: General utilities to work with Dynpros
 ********************************************************************
 CLASS ZCL_AUT_DYNPRO_TOOLS DEFINITION.
   PUBLIC SECTION.
-    CLASS-METHODS: update_dynpro_fields IMPORTING iv_dynnr TYPE dynnr
-                                        CHANGING  co_data  TYPE REF TO data.
+    CLASS-METHODS: update_dynpro_fields IMPORTING iv_dynnr  TYPE dynnr
+                                                  iv_prefix TYPE clike OPTIONAL
+                                        CHANGING  co_data   TYPE REF TO data.
 ENDCLASS.
 
-CLASS ZCL_AUT_DYNPRO_TOOLS   IMPLEMENTATION.
+CLASS ZCL_AUT_DYNPRO_TOOLS IMPLEMENTATION.
   METHOD update_dynpro_fields.
     "Updates fields of a structure taking current values set in the UI
     "even if they have not been commited by executing a user command
+    "The prefix means for example if all fields of the dynpro are in structure GS_0100
+    "like GS_0100-MATNR, etc. then iv prefix should be provided with value 'GS_0100-'
     DATA: lt_fields     TYPE STANDARD TABLE OF dynpread,
           lt_all_fields TYPE STANDARD TABLE OF rsdcf,
           lt_lines      TYPE STANDARD TABLE OF tline.
@@ -74,7 +79,7 @@ CLASS ZCL_AUT_DYNPRO_TOOLS   IMPLEMENTATION.
     "Finally put the values from the UI back to the data structure
     lcl_dynamic_utils=>transpose_tab_to_str(
       EXPORTING
-        iv_remove_name = 'GS_0100-'
+        iv_remove_name = iv_prefix
         it_data        = lt_fields
         iv_name_field  = 'FIELDNAME'
         iv_value_field = 'FIELDVALUE'
