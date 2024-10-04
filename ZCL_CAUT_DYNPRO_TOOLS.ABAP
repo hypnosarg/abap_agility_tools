@@ -3,7 +3,7 @@
 ********************************************************************
 *ZCL_AUT_DYNPRO_TOOLS: General utilities to work with Dynpros
 ********************************************************************
-CLASS ZCL_AUT_DYNPRO_TOOLS DEFINITION
+CLASS ZCL_CAUT_DYNPRO_TOOLS DEFINITION
    PUBLIC
    FINAL
    CREATE PUBLIC.
@@ -13,7 +13,7 @@ CLASS ZCL_AUT_DYNPRO_TOOLS DEFINITION
                                         CHANGING  co_data   TYPE REF TO data.
 ENDCLASS.
 
-CLASS ZCL_AUT_DYNPRO_TOOLS IMPLEMENTATION.
+CLASS ZCL_CAUT_DYNPRO_TOOLS IMPLEMENTATION.
   METHOD update_dynpro_fields.
     "Updates fields of a structure taking current values set in the UI
     "even if they have not been commited by executing a user command
