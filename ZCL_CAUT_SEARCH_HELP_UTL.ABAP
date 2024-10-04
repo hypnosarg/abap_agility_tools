@@ -1,7 +1,10 @@
 ********************************************************************
 *zcl_caut_search_help_utl: Provides tools to present search helps
 ******************************************************************** 
-CLASS zcl_caut_search_help_utl DEFINITION.
+CLASS zcl_caut_search_help_utl DEFINITION
+   PUBLIC
+   FINAL
+   CREATE PUBLIC.
   PUBLIC SECTION.
     CLASS-METHODS:
       show_key_desc_sh IMPORTING it_values      TYPE STANDARD TABLE
