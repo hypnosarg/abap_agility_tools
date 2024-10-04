@@ -1,7 +1,12 @@
 ********************************************************************
 *ZCL_CAUT_ALV_UTILS: General utilities to work with ALVs
 ********************************************************************
-CLASS ZCL_CAUT_ALV_UTILS DEFINITION INHERITING  FROM cl_gui_alv_grid..
+CLASS zcl_caut_alv_utils
+   DEFINITION
+   PUBLIC
+   FINAL
+   CREATE PUBLIC
+   INHERITING  FROM cl_gui_alv_grid..
   PUBLIC SECTION.
     CLASS-METHODS: get_grid  IMPORTING io_parent      TYPE REF TO cl_gui_container
                              CHANGING  ct_data        TYPE ANY TABLE
@@ -22,29 +27,122 @@ CLASS ZCL_CAUT_ALV_UTILS DEFINITION INHERITING  FROM cl_gui_alv_grid..
 
 
 ENDCLASS.
+
+
+
 CLASS ZCL_CAUT_ALV_UTILS IMPLEMENTATION.
-  METHOD set_field_editable ##NEEDED. "Part of the utilities framework
-
-    DATA: lt_fcat  TYPE  lvc_t_fcat.
-
-    co_grid->get_frontend_fieldcatalog(
-     IMPORTING
-       et_fieldcatalog = lt_fcat
-   ).
 
 
-    READ TABLE lt_fcat WITH KEY fieldname = iv_fieldname
-                       ASSIGNING FIELD-SYMBOL(<ls_field>).
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method ZCL_CAUT_ALV_UTILS=>FORCE_RAISE_DATA_CHANGED
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IO_GRID                        TYPE REF TO CL_GUI_ALV_GRID
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD force_raise_data_changed ##NEEDED. "Part of the utilities framework
+
+    FIELD-SYMBOLS: <lt_outdata> TYPE STANDARD TABLE.
+    DATA: lo_descr  TYPE REF TO cl_abap_structdescr,
+          lo_descr2 TYPE REF TO cl_abap_structdescr.
+
+    CHECK io_grid IS BOUND.
+
+    "Just assign a dumy delta record with the value of the first cell first row of the output
+    DATA(lo_data) = get_displayed_data( io_grid ).
+    CHECK lo_data IS BOUND.
+
+    ASSIGN lo_data->* TO <lt_outdata>.
+    CHECK <lt_outdata> IS NOT INITIAL.
+    READ TABLE <lt_outdata> INDEX 1 ASSIGNING FIELD-SYMBOL(<ls_first>).
     CHECK sy-subrc = 0.
-    <ls_field>-edit = abap_on.
-    <ls_field>-checktable = '!'.
-    IF iv_length IS SUPPLIED.
-      <ls_field>-outputlen = iv_length.
-    ENDIF.
-    co_grid->set_frontend_fieldcatalog( it_fieldcatalog = lt_fcat ).
 
+
+    lo_descr ?= cl_abap_structdescr=>describe_by_data( p_data = <ls_first> ).
+    CHECK lo_descr IS BOUND.
+    READ TABLE lo_descr->get_components( ) INDEX 1 INTO DATA(ls_comp).
+    CHECK sy-subrc = 0.
+    lo_descr2 ?= ls_comp-type.
+    READ TABLE lo_descr2->get_components( ) INDEX 1 INTO ls_comp.
+    CHECK sy-subrc = 0.
+
+    ASSIGN COMPONENT ls_comp-name OF STRUCTURE <ls_first> TO FIELD-SYMBOL(<lv_value>).
+
+    DATA(lt_delta) = VALUE lvc_t_modi( ( row_id    = 1
+                                         fieldname =  ls_comp-name
+                                         value     =  <lv_value>
+                                          ) ).
+    io_grid->set_delta_cells(
+      EXPORTING
+        it_delta_cells  = lt_delta
+        i_modified      = abap_true
+        i_frontend_only = abap_true
+    ).
+    io_grid->check_changed_data( ).
 
   ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method ZCL_CAUT_ALV_UTILS=>GET_DISPLAYED_DATA
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IO_GRID                        TYPE REF TO CL_GUI_ALV_GRID
+* | [<-()] RO_DATA                        TYPE REF TO DATA
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_displayed_data ##NEEDED. "Part of the utilities framework
+    ro_data = io_grid->mt_outtab.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method ZCL_CAUT_ALV_UTILS=>GET_GRID
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IO_PARENT                      TYPE REF TO CL_GUI_CONTAINER
+* | [<-->] CT_DATA                        TYPE        ANY TABLE
+* | [<-()] RO_GRID                        TYPE REF TO CL_GUI_ALV_GRID
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_grid ##NEEDED. "Part of the utilities framework
+    DATA: lo_salv   TYPE REF TO cl_salv_table,
+          ls_layout TYPE lvc_s_layo.
+    TRY.
+        "We use a SALV to do all the heavy work for us
+        cl_salv_table=>factory(
+          IMPORTING
+            r_salv_table   = lo_salv
+          CHANGING
+            t_table        = ct_data
+        ).
+
+        ro_grid = NEW cl_gui_alv_grid( i_parent         =  io_parent ).
+        cl_salv_controller_metadata=>get_lvc_layout(
+           EXPORTING
+             r_functional_settings = lo_salv->get_functional_settings( )
+             r_display_settings    = lo_salv->get_display_settings( )
+             r_columns             = lo_salv->get_columns( )
+             r_aggregations        = lo_salv->get_aggregations( )
+             r_selections          = lo_salv->get_selections( )
+           CHANGING
+             s_layout              = ls_layout ).
+
+        DATA(lt_fcat) = cl_salv_controller_metadata=>get_lvc_fieldcatalog(
+                                                        r_columns      = lo_salv->get_columns( )
+                                                        r_aggregations = lo_salv->get_aggregations( )    ).
+        ro_grid->set_frontend_layout( ls_layout  ).
+        ro_grid->set_frontend_fieldcatalog( lt_fcat ).
+      CATCH cx_root.
+        RETURN.
+    ENDTRY.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method ZCL_CAUT_ALV_UTILS=>SET_DROPDOWN_FOR_FIELD
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_FIELDNAME                   TYPE        CLIKE
+* | [--->] IV_LENGTH                      TYPE        NUMERIC(optional)
+* | [--->] IT_VALUES                      TYPE        ANY TABLE
+* | [--->] IV_VALUE_FLD                   TYPE        CLIKE
+* | [--->] IV_DESCR_FLD                   TYPE        CLIKE(optional)
+* | [<-->] CO_GRID                        TYPE REF TO CL_GUI_ALV_GRID
+* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD set_dropdown_for_field ##NEEDED. "Part of the utilities framework
     DATA: lv_descr TYPE string,
           lt_ddali TYPE lvc_t_dral.
@@ -97,80 +195,35 @@ CLASS ZCL_CAUT_ALV_UTILS IMPLEMENTATION.
     co_grid->set_frontend_fieldcatalog( it_fieldcatalog = lt_fcat ).
 
   ENDMETHOD.
-  METHOD get_displayed_data ##NEEDED. "Part of the utilities framework
-    ro_data = io_grid->mt_outtab.
-  ENDMETHOD.
-  METHOD force_raise_data_changed ##NEEDED. "Part of the utilities framework
 
-    FIELD-SYMBOLS: <lt_outdata> TYPE STANDARD TABLE.
-    DATA: lo_descr  TYPE REF TO cl_abap_structdescr,
-          lo_descr2 TYPE REF TO cl_abap_structdescr.
 
-    CHECK io_grid IS BOUND.
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method ZCL_CAUT_ALV_UTILS=>SET_FIELD_EDITABLE
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_FIELDNAME                   TYPE        CLIKE
+* | [--->] IV_LENGTH                      TYPE        NUMERIC(optional)
+* | [<-->] CO_GRID                        TYPE REF TO CL_GUI_ALV_GRID
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD set_field_editable ##NEEDED. "Part of the utilities framework
 
-    "Just assign a dumy delta record with the value of the first cell first row of the output
-    DATA(lo_data) = get_displayed_data( io_grid ).
-    CHECK lo_data IS BOUND.
+    DATA: lt_fcat  TYPE  lvc_t_fcat.
 
-    ASSIGN lo_data->* TO <lt_outdata>.
-    CHECK <lt_outdata> IS NOT INITIAL.
-    READ TABLE <lt_outdata> INDEX 1 ASSIGNING FIELD-SYMBOL(<ls_first>).
+    co_grid->get_frontend_fieldcatalog(
+     IMPORTING
+       et_fieldcatalog = lt_fcat
+   ).
+
+
+    READ TABLE lt_fcat WITH KEY fieldname = iv_fieldname
+                       ASSIGNING FIELD-SYMBOL(<ls_field>).
     CHECK sy-subrc = 0.
+    <ls_field>-edit = abap_on.
+    <ls_field>-checktable = '!'.
+    IF iv_length IS SUPPLIED.
+      <ls_field>-outputlen = iv_length.
+    ENDIF.
+    co_grid->set_frontend_fieldcatalog( it_fieldcatalog = lt_fcat ).
 
 
-    lo_descr ?= cl_abap_structdescr=>describe_by_data( p_data = <ls_first> ).
-    CHECK lo_descr IS BOUND.
-    READ TABLE lo_descr->get_components( ) INDEX 1 INTO DATA(ls_comp).
-    CHECK sy-subrc = 0.
-    lo_descr2 ?= ls_comp-type.
-    READ TABLE lo_descr2->get_components( ) INDEX 1 INTO ls_comp.
-    CHECK sy-subrc = 0.
-
-    ASSIGN COMPONENT ls_comp-name OF STRUCTURE <ls_first> TO FIELD-SYMBOL(<lv_value>).
-
-    DATA(lt_delta) = VALUE lvc_t_modi( ( row_id    = 1
-                                         fieldname =  ls_comp-name
-                                         value     =  <lv_value>
-                                          ) ).
-    io_grid->set_delta_cells(
-      EXPORTING
-        it_delta_cells  = lt_delta
-        i_modified      = abap_true
-        i_frontend_only = abap_true
-    ).
-    io_grid->check_changed_data( ).
-
-  ENDMETHOD.
-  METHOD get_grid ##NEEDED. "Part of the utilities framework
-    DATA: lo_salv   TYPE REF TO cl_salv_table,
-          ls_layout TYPE lvc_s_layo.
-    TRY.
-        "We use a SALV to do all the heavy work for us
-        cl_salv_table=>factory(
-          IMPORTING
-            r_salv_table   = lo_salv
-          CHANGING
-            t_table        = ct_data
-        ).
-
-        ro_grid = NEW cl_gui_alv_grid( i_parent         =  io_parent ).
-        cl_salv_controller_metadata=>get_lvc_layout(
-           EXPORTING
-             r_functional_settings = lo_salv->get_functional_settings( )
-             r_display_settings    = lo_salv->get_display_settings( )
-             r_columns             = lo_salv->get_columns( )
-             r_aggregations        = lo_salv->get_aggregations( )
-             r_selections          = lo_salv->get_selections( )
-           CHANGING
-             s_layout              = ls_layout ).
-
-        DATA(lt_fcat) = cl_salv_controller_metadata=>get_lvc_fieldcatalog(
-                                                        r_columns      = lo_salv->get_columns( )
-                                                        r_aggregations = lo_salv->get_aggregations( )    ).
-        ro_grid->set_frontend_layout( ls_layout  ).
-        ro_grid->set_frontend_fieldcatalog( lt_fcat ).
-      CATCH cx_root.
-        RETURN.
-    ENDTRY.
   ENDMETHOD.
 ENDCLASS.
