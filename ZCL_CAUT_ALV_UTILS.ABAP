@@ -6,7 +6,7 @@ CLASS zcl_caut_alv_utils
    PUBLIC
    FINAL
    CREATE PUBLIC
-   INHERITING  FROM cl_gui_alv_grid..
+   INHERITING  FROM cl_gui_alv_grid.
   PUBLIC SECTION.
     CLASS-METHODS: get_grid  IMPORTING io_parent      TYPE REF TO cl_gui_container
                              CHANGING  ct_data        TYPE ANY TABLE
