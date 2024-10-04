@@ -3,7 +3,10 @@
 ********************************************************************
 *ZCL_AUT_DYNPRO_TOOLS: General utilities to work with Dynpros
 ********************************************************************
-CLASS ZCL_AUT_DYNPRO_TOOLS DEFINITION.
+CLASS ZCL_AUT_DYNPRO_TOOLS DEFINITION
+   PUBLIC
+   FINAL
+   CREATE PUBLIC.
   PUBLIC SECTION.
     CLASS-METHODS: update_dynpro_fields IMPORTING iv_dynnr  TYPE dynnr
                                                   iv_prefix TYPE clike OPTIONAL
